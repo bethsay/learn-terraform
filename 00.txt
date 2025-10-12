@@ -1,0 +1,224 @@
+Terraform allows us to create cloud-agnostic IaC.
+All terraform files that we create should have the extention ".tf"
+Once Iac is prepared, we get terraform to process all of it with the below command.
+    #terraform plan
+Once its processed and the output looks good to us, we can use terraform to create that infrastucture with the below command.
+    #terraform apply
+If you want to delete all the cloud resources created by terraform, then use
+    #terraform destroy
+Write .tf files -> terraform plan -> terraform apply
+terraform Plan will read files and tell us what changes will happen. Once we approve, we should run terraform apply
+
+Lets start with installing terraform on ubuntu
+    #wget -O - https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /etc/apt/keyrings/hashicorp-archive-keyring.gpg
+    #echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+    #sudo apt update && sudo apt install terraform
+    #terraform -help
+To enable autocompletion for terraform commands. This will append a line to ~/.bashrc
+    #terraform -install-autocomplete
+For other systems, check https://developer.hashicorp.com/terraform/install
+
+Lets understand the major/basic components of a terraform project.
+    #mkdir basics && cd basics
+After we create our Iac, Terraform needs to convert it to the actual apis of that specific cloud vendor. This is done by terraform providers.
+Hashicorp and its partners have published these "providers" package at https://registry.terraform.io/browse/providers
+Lets start off with using the local provider which has the simple capability of creating files in the local systems.
+    #vim providers.tf
+Lets paste the code we get when clicking on "Use Provider" at https://registry.terraform.io/providers/hashicorp/local/latest into providers.tf
+Now, we need to install this provider package.
+    #terraform init
+This creates a .terraform folder tree to download the binaries/packages of the required_providers and a .terraform.lock.hcl
+If any modification is made to required_providers block, we must re-run terraform init
+At the terrform registry page, the Documentation of every provider, will list and describe all the resources that can be managed by the provider.
+For local provider, we can create local_file and local_sensitive_file resources. https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file
+    #vim resources.tf
+Lets paste the code of the local_file resource.
+Lets process our Iac with
+    #terraform plan
+This command will describe to us all the creations and deletions terraform intends to perfom.
+If the plan looks good lets implement it with
+    #terraform apply
+Terraform apply command includes the terraform plan command. Its okay to skip it.
+After the first run of terraform apply, it creates a terraform.tfstate file. tfstate file holds the detailed report of resources created by terraform.
+Lets make modifications to resource file and see how terraform responds
+    #vim main.tf
+        ->Customise the path, content and resource_name of local_file block. 
+        ->Add a local_sensitive_file block
+    #terraform apply
+From the second run of the terraform apply, terraform.tfstate is renamed to terrform.tfstate.backup and a new terraform.tfstate is created. To see if any resources were destroyed or to do a before-after comparison, this would be useful
+    #vim main.tf
+    #	resource "local_sensitive_file" "sensitive_resource" {
+    #	  content  = "do not see the contents"
+    #	  filename = "${path.module}/foo.bar"
+    #	}
+    #terraform destroy
+    #terraform apply
+    #vim main.tf --> resource type+name must be unique. Duplicate one of the blocks
+    #terraform apply
+    #vim main.tf --> Add one more local_file resource
+
+Terraform plan will read our .tf files, parse it with the provider installed during init. This is the content that is actually understood by terraform. This is then again converted to an output that we can read and understand.
+terraform plan -help
+terraform plan -out=./temp --> this is not user readable but usable for terraform only
+terraform apply "./temp" --> will execute without asking for approval
+terraform plan
+terraform destroy -auto-approve --> DO NOT USE this in real world
+terraform apply -auto-approve
+
+While each resource has its unique arguments, all resources will suppor terraform meta-arguments like count, depends_on, for_each, lifecycle.
+https://developer.hashicorp.com/terraform/language/meta-arguments
+
+vim main.tf --> Delete all blocks then use this
+	resource "local_file" "resource_name" {
+	  content  = "...Hello World...!!"
+	  filename = "${path.module}/file${count.index}_by_tf.txt"
+	  count = 4
+	}
+terraform apply
+terraform destroy -target=local_file.resource_name[2] --> Not standard practice as main.tf is a deviation from current state. Better to edit/comment in main.tf
+
+Terraform apply command implements the plan. At the same time, it logs all changes into a state file.
+less terraform.tfstate --> It would have been good if you tracked contents of this file during previous commands.
+terraform state -h
+terraform state list
+terraform state show resource_type.resource_name
+
+When plan or apply commands are used, the parsed main.tf is compared with the actual state at the CSP target and the difference is outputted to us for approval.
+State Drift happens when actual infra is modified without terraform. Here actual state will be different from state file and code.tf
+If state drift is accidental, use below command to apply/enforce IaC and overwrite actual state
+	terraform plan
+	terraform apply
+If state drift is intentional, use below command to update terraform.tfstate with the actual state of provider. But there is still drift at our main.tf but no changes are applies at CSP
+	terraform refresh
+terraform plan performs a refresh before creating the plan
+
+terraform.tfstate will contain the sensitive data/keys in plain text. The path of state file is configured by backend block. Default is local.
+vim providers.tf  --> use s3 bucket as a backend
+	terraform {
+	  required_providers {...}
+	  backend "s3" {
+	    bucket = "mybucket"
+	    key    = "path/to/my/key"
+	    region = "us-east-1"
+	  }
+	}
+Other backends include remote(hcp or enterprise), azurerm blob, googlecs, postgres, k8secret, http, https://developer.hashicorp.com/terraform/language/backend
+
+input, output and local are the types of variables available in terraform
+mkdir terraform_vars
+vim providers.tf --> skip backend block
+terraform init
+vim main.tf --> create 3 local_file blocks
+vim variables.tf
+	variable "file1" {
+	  description = file1
+	  default = "sample1"
+	  type = string
+	}
+	variable "file2" {...}
+	variable "file3" {...}
+vim main.tf
+	resource "local_file" "sample1" {
+	  content  = "...This is ${var.file1}...!!"
+	  filename = "${path.module}/${var.file1}.txt"
+	}
+	resource "local_file" "sample2" {...}
+	resource "local_file" "sample3" {...}
+terraform plan
+vim variables.tf --> Append at the end
+	variable "count" {
+	  type = number
+	  default = 1
+	}
+vim main.tf --> Update each block
+	resource "local_file" "sample1" {
+	  count = var.count
+	}
+terraform plan
+terraform plan -var count=5
+vim myvalues.auto.tfvars OR vim terraform.tfvars
+	file1 = "server"
+	file2 = "client"
+	count = 2
+terraform plan
+vim main.tf --> Append local at the top and update path of each resource
+	local {
+	  local_path = "${path.module}/parent/child"
+	}
+	resource "local_file" "sample1" {
+	  path = "${local.local_path}/${var.file1}.txt"
+	}
+terraform plan
+vim main.tf --> Update local and resource
+	local {
+	  env = "dev"
+	  env_caps = upper (env)
+	  local_path = "${path.module}/${local.env_caps}/${local.env}"
+	}
+	resource "local_path" "sample1" {
+	  content = "...This is ${var.file1} in the ${local.env_caps} environment...!!"
+	  filename = ...
+	  count = ...
+	}
+terraform plan
+vim output.tf
+	output "path" {
+	  value = "All your files are created in ${local.local_path}"
+	  sensitive = false
+	}
+terraform plan
+
+Modules are a full working terraform folder that can be reused.
+Any project of your will be the root module. This will contain multiple child and/or published modules. Let use terraform_vars as a child module
+mkdir -p terraform_root_module/child_module
+vim child_module/main.tf
+	terraform {
+	  required_providers {
+	    local = {
+	      source = "hashicorp/local"
+	      version = "2.5.1"
+	    }
+	  }
+	}
+	resource "local_file" "file" {
+	  content  = var.file_content
+	  filename = "${path.module}/${var.file_name}.txt"
+	}
+vim child_module/variable.tf
+	variable "file_name" {
+	  description = "file name"
+	  default = file.txt
+	  type = string
+	}
+	variable "file_content" {
+	  description = "file content"
+	  default = "...This is content of ${var.file1}...!!"
+	  type = string
+	}
+vim child_module/output.tf
+	output "file_path" {
+	  value = "Your file is created in ${local_file.file.filename}"
+	  sensitive = false
+	}
+vim main.tf
+	terraform {
+	  required_providers {
+	    local = {
+	      source = "hashicorp/local"
+	      version = "2.5.1"
+	    }
+	  }
+	}
+	local {
+	  files {
+	    Mainfile = "This is content of main file"
+	    Subfile = "Other information is available here"
+	module "create_file" {
+	  source = "./child_module"
+	  for_each = local.files
+
+	  file_name = 
+	  file_content = "I should not see default content"
+	}
+
+
