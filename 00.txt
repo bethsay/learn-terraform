@@ -41,21 +41,42 @@ If the plan looks good lets implement it with
 Terraform apply command includes the terraform plan command. Its okay to skip it.
 After the first run of terraform apply, it creates a terraform.tfstate file. tfstate file holds the detailed report of resources created by terraform.
 Lets make modifications to resource file and see how terraform responds
-    #vim main.tf
+    #vim resource.tf
         ->Customise the path, content and resource_name of local_file block. 
-        ->Add a local_sensitive_file block
     #terraform apply
 From the second run of the terraform apply, terraform.tfstate is renamed to terrform.tfstate.backup and a new terraform.tfstate is created. To see if any resources were destroyed or to do a before-after comparison, this would be useful
-    #vim main.tf
-    #	resource "local_sensitive_file" "sensitive_resource" {
-    #	  content  = "do not see the contents"
-    #	  filename = "${path.module}/foo.bar"
-    #	}
+    #vim resource.tf
+        ->Add a local_sensitive_file block
+    #terraform apply
+You will see that the content of the sensitive_resource is masked while the plan was being processed.
+This is how keys, passwords and other sensitive code will be handled by terraform.
+Have a look at the tfstate file and the sensitive_resource created by the latest apply.
+    #less terraform.tfstate
+    #cat training/sensitive_file_by_tf.txt
+The sensitive data will be used as is within the tfstate and the resource.
+To delete/destroy all resource tracked by the tfstate (not the Iac) use
     #terraform destroy
+The combination or resource_name + resource_type must be unique within a terraform project
+    #vim main.tf
+        ->Duplicate the local_file block.
     #terraform apply
-    #vim main.tf --> resource type+name must be unique. Duplicate one of the blocks
+        ->Error: Duplicate resource
+    #vim main.tf
+        ->Use unique values for resource_name, content and filename.
+        ->There wont be error if content and filename are not unique, but results will be problematic
     #terraform apply
-    #vim main.tf --> Add one more local_file resource
+While every resource have their own unique arguments, they also support terraforms meta-arguments like count, depends_on, for_each, lifecycle. https://developer.hashicorp.com/terraform/language/meta-arguments
+Lets try the count meta-argument.
+    #vim main.tf
+        ->Add count = 4 into latest local_file blocks
+        ->Use the ${count.index} parameter into its filename as well.
+    #terraform apply
+    #ls -lah training/
+    #less terraform.tfstate
+Using the -target flag in plan, apply, or destroy command can get terraform to operate on a specific resource.
+    #terraform destroy -target=local_file.another_resource[2]
+    #terraform apply -target=local_file.another_resource[2]
+It is not standard practice to use -target. Its best to edit/comment all the changes in main.tf.
 
 Terraform plan will read our .tf files, parse it with the provider installed during init. This is the content that is actually understood by terraform. This is then again converted to an output that we can read and understand.
 terraform plan -help
@@ -65,17 +86,6 @@ terraform plan
 terraform destroy -auto-approve --> DO NOT USE this in real world
 terraform apply -auto-approve
 
-While each resource has its unique arguments, all resources will suppor terraform meta-arguments like count, depends_on, for_each, lifecycle.
-https://developer.hashicorp.com/terraform/language/meta-arguments
-
-vim main.tf --> Delete all blocks then use this
-	resource "local_file" "resource_name" {
-	  content  = "...Hello World...!!"
-	  filename = "${path.module}/file${count.index}_by_tf.txt"
-	  count = 4
-	}
-terraform apply
-terraform destroy -target=local_file.resource_name[2] --> Not standard practice as main.tf is a deviation from current state. Better to edit/comment in main.tf
 
 Terraform apply command implements the plan. At the same time, it logs all changes into a state file.
 less terraform.tfstate --> It would have been good if you tracked contents of this file during previous commands.
