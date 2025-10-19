@@ -35,28 +35,13 @@ For local provider, we can create local_file and local_sensitive_file resources.
 Lets paste the code of the local_file resource.
 Lets process our Iac with
     #terraform plan
-This command will describe to us all the creations and deletions terraform intends to perfom.
+This command will describe to us all the creations and deletions terraform intends to perform.
 If the plan looks good lets implement it with
     #terraform apply
 Terraform apply command includes the terraform plan command. Its okay to skip it.
 After the first run of terraform apply, it creates a terraform.tfstate file. tfstate file holds the detailed report of resources created by terraform.
 Lets make modifications to resource file and see how terraform responds
-    #vim resource.tf
-        ->Customise the path, content and resource_name of local_file block. 
-    #terraform apply
-From the second run of the terraform apply, terraform.tfstate is renamed to terrform.tfstate.backup and a new terraform.tfstate is created. To see if any resources were destroyed or to do a before-after comparison, this would be useful
-    #vim resource.tf
-        ->Add a local_sensitive_file block
-    #terraform apply
-You will see that the content of the sensitive_resource is masked while the plan was being processed.
-This is how keys, passwords and other sensitive code will be handled by terraform.
-Have a look at the tfstate file and the sensitive_resource created by the latest apply.
-    #less terraform.tfstate
-    #cat training/sensitive_file_by_tf.txt
-The sensitive data will be used as is within the tfstate and the resource.
-To delete/destroy all resource tracked by the tfstate (not the Iac) use
-    #terraform destroy
-The combination or resource_name + resource_type must be unique within a terraform project
+Keep in mind, the combination or resource_name + resource_type must be unique within a terraform project
     #vim main.tf
         ->Duplicate the local_file block.
     #terraform apply
@@ -65,6 +50,20 @@ The combination or resource_name + resource_type must be unique within a terrafo
         ->Use unique values for resource_name, content and filename.
         ->There wont be error if content and filename are not unique, but results will be problematic
     #terraform apply
+From the second run of the terraform apply, terraform.tfstate is renamed to terrform.tfstate.backup and a new terraform.tfstate is created. To see if any resources were destroyed or to do a before-after comparison, this would be useful
+    #sdiff -s terraform.tfstate terraform.tfstate.backup
+    #vim resource.tf
+        ->Add a local_sensitive_file block
+    #terraform apply
+You will see that the content of the sensitive_resource is masked while the plan was being processed.
+This is how keys, passwords and other sensitive variables will be handled by terraform.
+Have a look at the tfstate file and the sensitive_resource created by the latest apply.
+    #less terraform.tfstate
+    #cat training/sensitive_file_by_tf.txt
+The sensitive data will be used as is within the tfstate and the resource.
+To delete/destroy all resource tracked by the tfstate (not the Iac) use
+    #terraform destroy
+
 While every resource have their own unique arguments, they also support terraforms meta-arguments like count, depends_on, for_each, lifecycle. https://developer.hashicorp.com/terraform/language/meta-arguments
 Lets try the count meta-argument.
     #vim main.tf
@@ -77,21 +76,40 @@ Using the -target flag in plan, apply, or destroy command can get terraform to o
     #terraform destroy -target=local_file.another_resource[2]
     #terraform apply -target=local_file.another_resource[2]
 It is not standard practice to use -target. Its best to edit/comment all the changes in main.tf.
+Lets revisit this for other meta-arguments.
 
-Terraform plan will read our .tf files, parse it with the provider installed during init. This is the content that is actually understood by terraform. This is then again converted to an output that we can read and understand.
-terraform plan -help
-terraform plan -out=./temp --> this is not user readable but usable for terraform only
-terraform apply "./temp" --> will execute without asking for approval
-terraform plan
-terraform destroy -auto-approve --> DO NOT USE this in real world
-terraform apply -auto-approve
+Terraform plan will read our .tf files, parse it with the required_providers installed during init. This can be saved as a plan file.
+This is the content that is actually used by terraform. This is then again converted to an output that we can read and understand.
+    #terraform plan -out ./local.tfplan
+        ->You can see in stdout the actions that terraform will do if the plan is executed.
+        ->This also creates a local.tfplan file. We cant read the file but it can be processed by any terraform client.
+    #terraform show ./local.tfplan
+        ->This allows us to read a plan before execution
+Until now, when terraform apply was run, the plan was shown and we had to approve it for execution.
+If we instead try to apply this local.tfplan, we will not see the plan in the stdout and terrform will not wait for an approval before executing it.
+    #terraform apply local.tfplan
+The plan is bound to the tfstate file during its creation. If the tfstate changes before the plan is applied, it will be considered as stale and cannot be used.
+This means the same plan cannot be reused because applying it causes the state to change and the plan to become stale.
+Our .tf files can be parsed by terraform plan to create a destroy plan.
+    #terraform plan -destroy -out ./local.tfplan
+    #terraform show ./local.tfplan
+    #terraform apply local.tfplan
+Cleaup the stale plan
+    #rm local.tfplan
+Terraform can execute an apply or destroy without asking for approval when using the flag -auto-approve
+    #terraform apply -auto-approve
+    #terraform apply -destroy -auto-approve
+        ->Same as terraform destroy -auto-approve
 
-
-Terraform apply command implements the plan. At the same time, it logs all changes into a state file.
-less terraform.tfstate --> It would have been good if you tracked contents of this file during previous commands.
-terraform state -h
-terraform state list
-terraform state show resource_type.resource_name
+Every terraform apply implements the plan and update the terraform.tfstate
+    #less terraform.tfstate
+Another way to read the current state is with the terraform state command
+    #terraform state -h
+    #terraform state list
+        ->Lists all resource.identifier managed in this terraform workspace.
+    #terraform state show resource_type.resource_name
+        ->Check the details of any of resource.identifier mentioned in the list command.
+Lets revisit to check the subcommands of terraform state.
 
 When plan or apply commands are used, the parsed main.tf is compared with the actual state at the CSP target and the difference is outputted to us for approval.
 State Drift happens when actual infra is modified without terraform. Here actual state will be different from state file and code.tf
