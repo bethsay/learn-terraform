@@ -109,28 +109,43 @@ Another way to read the current state is with the terraform state command
         ->Lists all resource.identifier managed in this terraform workspace.
     #terraform state show resource_type.resource_name
         ->Check the details of any of resource.identifier mentioned in the list command.
+    #terraform state show local_sensitive_file.sensitive_resource
+        ->sensitive data of any resource will be masked just as it was in the stdout of plan and apply
+While the state show command will mask sensitive data, it is stored as plain text in terraform.tfstate
+By default, tfstate is stored locally in the workspace which is unsecure.
+You can maintain tfstate at a remote secure location by defining a backend configuration. Lets try s3 as a backend.
+    #vim providers.tf
+        ->terraform {
+        ->  required_providers {...}
+        ->  backend "s3" {
+        ->    bucket = "mybucket"
+        ->    key    = "path/to/my/key"
+        ->    region = "us-east-1"
+        ->  }
+        ->}
+Other backends include remote(hcp or enterprise), azurerm blob, googlecs, postgres, k8secret, http, https://developer.hashicorp.com/terraform/language/backend
 Lets revisit to check the subcommands of terraform state.
 
-When plan or apply commands are used, the parsed main.tf is compared with the actual state at the CSP target and the difference is outputted to us for approval.
+When plan or apply is being run, the tfstate is pulled into memory. It is compared and updated with the actual infrastucture Configuration.
+State Drift is said to have occured if the actual infra is different from the tfstate. This can also be seen as modifications of the in-memory tfstate.
 State Drift happens when actual infra is modified without terraform. Here actual state will be different from state file and code.tf
-If state drift is accidental, use below command to apply/enforce IaC and overwrite actual state
-	terraform plan
-	terraform apply
-If state drift is intentional, use below command to update terraform.tfstate with the actual state of provider. But there is still drift at our main.tf but no changes are applies at CSP
-	terraform refresh
-terraform plan performs a refresh before creating the plan
-
-terraform.tfstate will contain the sensitive data/keys in plain text. The path of state file is configured by backend block. Default is local.
-vim providers.tf  --> use s3 bucket as a backend
-	terraform {
-	  required_providers {...}
-	  backend "s3" {
-	    bucket = "mybucket"
-	    key    = "path/to/my/key"
-	    region = "us-east-1"
-	  }
-	}
-Other backends include remote(hcp or enterprise), azurerm blob, googlecs, postgres, k8secret, http, https://developer.hashicorp.com/terraform/language/backend
+The plan or apply commands then parse tf files of the workspace with provider and is again compared with the in-memory tfstate and the difference is outputted to us for approval.
+Lets cause State Drift in our workspace.
+    #cd basics
+    #echo "State Drift is happening" > ./training/file_by_tf.txt
+Is this change detected by tf state?
+    #less terraform.tfstate
+    #terraform state show local_file.resource_name
+To see the effect of state drift on tfstate
+    #terraform plan -refresh-only
+If state drift is unexpected, correct it by applying the IaC and overwrite actual state
+    #terraform plan
+    #terraform apply
+If state drift is intentional and if it must not be corrected by terraform, use the refresh command to update the tfstate reflects the actual state.
+    #terraform refresh
+Terrform modifications is either a create or destroy. Very rarely change is considered.
+So resources that have undergone state drift are often considered as destryed resources according to terraform.
+Just as terrform apply includes a plan stage, terraform plan includes a refresh stage.
 
 input, output and local are the types of variables available in terraform
 mkdir terraform_vars
