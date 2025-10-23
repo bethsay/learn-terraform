@@ -18,7 +18,7 @@ To enable autocompletion for terraform commands. This will append a line to ~/.b
     #terraform -install-autocomplete
 For other systems, check https://developer.hashicorp.com/terraform/install
 
-Lets understand the major/basic components of a terraform project.
+Lets understand the core/basic concepts of a terraform project.
     #mkdir basics && cd basics
 After we create our Iac, Terraform needs to convert it to the actual apis of that specific cloud vendor. This is done by terraform providers.
 Hashicorp and its partners have published these "providers" package at https://registry.terraform.io/browse/providers
@@ -32,8 +32,7 @@ If any modification is made to required_providers block, we must re-run terrafor
 At the terrform registry page, the Documentation of every provider, will list and describe all the resources that can be managed by the provider.
 For local provider, we can create local_file and local_sensitive_file resources. https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file
     #vim resources.tf
-Lets paste the code of the local_file resource.
-Lets process our Iac with
+Lets paste the code of the local_file resource. Lets process our Iac with
     #terraform plan
 This command will describe to us all the creations and deletions terraform intends to perform.
 If the plan looks good lets implement it with
@@ -42,17 +41,17 @@ Terraform apply command includes the terraform plan command. Its okay to skip it
 After the first run of terraform apply, it creates a terraform.tfstate file. tfstate file holds the detailed report of resources created by terraform.
 Lets make modifications to resource file and see how terraform responds
 Keep in mind, the combination or resource_name + resource_type must be unique within a terraform project
-    #vim main.tf
+    #vim resources.tf
         ->Duplicate the local_file block.
     #terraform apply
         ->Error: Duplicate resource
-    #vim main.tf
+    #vim resources.tf
         ->Use unique values for resource_name, content and filename.
         ->There wont be error if content and filename are not unique, but results will be problematic
     #terraform apply
 From the second run of the terraform apply, terraform.tfstate is renamed to terrform.tfstate.backup and a new terraform.tfstate is created. To see if any resources were destroyed or to do a before-after comparison, this would be useful
     #sdiff -s terraform.tfstate terraform.tfstate.backup
-    #vim resource.tf
+    #vim resources.tf
         ->Add a local_sensitive_file block
     #terraform apply
 You will see that the content of the sensitive_resource is masked while the plan was being processed.
@@ -64,22 +63,9 @@ The sensitive data will be used as is within the tfstate and the resource.
 To delete/destroy all resource tracked by the tfstate (not the Iac) use
     #terraform destroy
 
-While every resource have their own unique arguments, they also support terraforms meta-arguments like count, depends_on, for_each, lifecycle. https://developer.hashicorp.com/terraform/language/meta-arguments
-Lets try the count meta-argument.
-    #vim main.tf
-        ->Add count = 4 into latest local_file blocks
-        ->Use the ${count.index} parameter into its filename as well.
-    #terraform apply
-    #ls -lah training/
-    #less terraform.tfstate
-Using the -target flag in plan, apply, or destroy command can get terraform to operate on a specific resource.
-    #terraform destroy -target=local_file.another_resource[2]
-    #terraform apply -target=local_file.another_resource[2]
-It is not standard practice to use -target. Its best to edit/comment all the changes in main.tf.
-Lets revisit this for other meta-arguments.
-
 Terraform plan will read our .tf files, parse it with the required_providers installed during init. This can be saved as a plan file.
 This is the content that is actually used by terraform. This is then again converted to an output that we can read and understand.
+    #cd basics
     #terraform plan -out ./local.tfplan
         ->You can see in stdout the actions that terraform will do if the plan is executed.
         ->This also creates a local.tfplan file. We cant read the file but it can be processed by any terraform client.
@@ -102,6 +88,7 @@ Terraform can execute an apply or destroy without asking for approval when using
         ->Same as terraform destroy -auto-approve
 
 Every terraform apply implements the plan and update the terraform.tfstate
+    #cd basics
     #less terraform.tfstate
 Another way to read the current state is with the terraform state command
     #terraform state -h
@@ -123,7 +110,7 @@ You can maintain tfstate at a remote secure location by defining a backend confi
         ->    region = "us-east-1"
         ->  }
         ->}
-Other backends include remote(hcp or enterprise), azurerm blob, googlecs, postgres, k8secret, http, https://developer.hashicorp.com/terraform/language/backend
+Other backends include remote(hcp or enterprise), azurerm blob, googlecs, postgres, k8secret, urls. https://developer.hashicorp.com/terraform/language/backend
 Lets revisit to check the subcommands of terraform state.
 
 When plan or apply is being run, the tfstate is pulled into memory. It is compared and updated with the actual infrastucture Configuration.
@@ -147,69 +134,74 @@ Terrform modifications is either a create or destroy. Very rarely change is cons
 So resources that have undergone state drift are often considered as destryed resources according to terraform.
 Just as terrform apply includes a plan stage, terraform plan includes a refresh stage.
 
-input, output and local are the types of variables available in terraform
-mkdir terraform_vars
-vim providers.tf --> skip backend block
-terraform init
-vim main.tf --> create 3 local_file blocks
-vim variables.tf
-	variable "file1" {
-	  description = file1
-	  default = "sample1"
-	  type = string
-	}
-	variable "file2" {...}
-	variable "file3" {...}
-vim main.tf
-	resource "local_file" "sample1" {
-	  content  = "...This is ${var.file1}...!!"
-	  filename = "${path.module}/${var.file1}.txt"
-	}
-	resource "local_file" "sample2" {...}
-	resource "local_file" "sample3" {...}
-terraform plan
-vim variables.tf --> Append at the end
-	variable "count" {
-	  type = number
-	  default = 1
-	}
-vim main.tf --> Update each block
-	resource "local_file" "sample1" {
-	  count = var.count
-	}
-terraform plan
-terraform plan -var count=5
-vim myvalues.auto.tfvars OR vim terraform.tfvars
-	file1 = "server"
-	file2 = "client"
-	count = 2
-terraform plan
-vim main.tf --> Append local at the top and update path of each resource
-	local {
-	  local_path = "${path.module}/parent/child"
-	}
-	resource "local_file" "sample1" {
-	  path = "${local.local_path}/${var.file1}.txt"
-	}
-terraform plan
-vim main.tf --> Update local and resource
-	local {
-	  env = "dev"
-	  env_caps = upper (env)
-	  local_path = "${path.module}/${local.env_caps}/${local.env}"
-	}
-	resource "local_path" "sample1" {
-	  content = "...This is ${var.file1} in the ${local.env_caps} environment...!!"
-	  filename = ...
-	  count = ...
-	}
-terraform plan
-vim output.tf
-	output "path" {
-	  value = "All your files are created in ${local.local_path}"
-	  sensitive = false
-	}
-terraform plan
+Every resource_type have their own unique arguments whose values allows us to codeify resource creation.
+Terraform has meta-arguments (count, depends_on, for_each) to be used on any resource, and are not restricted by type. https://developer.hashicorp.com/terraform/language/meta-arguments
+The count meta-argument can be used to create copies of a resource
+    #cd basics
+    #vim resources.tf
+        ->Add count = 4 into latest local_file blocks
+        ->Use the ${count.index} parameter into its filename as well.
+    #terraform apply
+    #ls -lah training/
+    #less terraform.tfstate
+Using the -target flag in plan, apply, or destroy command can get terraform to operate on a specific resource.
+    #terraform destroy -target=local_file.another_resource[2]
+    #terraform apply -target=local_file.another_resource[2]
+It is not standard practice to use -target. Its best to edit/comment all the changes in main.tf.
+Lets revisit this for other meta-arguments.
+
+Terraform variables block allows us to reuse the code in different workspaces without needing to edit the code. https://developer.hashicorp.com/terraform/language/block/variable
+Initialize a new workspace (directory or folder) with a local povider
+    #mkdir terraform_vars
+    #vim providers.tf
+        ->Use the hashicorp/local as a required_providers.
+    #terraform init
+Define 2 string variables with a default values.
+    #vim variables.tf
+Use these variables as filename for local_file resources.
+    #vim main.tf
+Create the resources
+    #terraform plan
+    #terraform apply
+Add a number variable with a default value
+    #vim variables.tf
+Use that number as resource multiplier using count meta-arguments in both resources.
+While Terraform indexes these resource copies starting from 0 to n-1. We are allowed to use math to number it however we want.
+Update filename to have a incremental parent directory of count.index+1
+    #vim main.tf
+Update the resources
+    #terraform apply
+If default value is not set for a variable, terraform will prompt the value during plan/apply.
+    #variables.tf
+        ->Comment out default value of replica
+    #terraform apply
+    #variables.tf
+        ->Uncomment default value of replica
+Updating the value of an input variable can by done during plan or apply using "-var"
+    #terraform apply -var replica=5
+But most often you would maintain all your variables in a file.
+Create a file with key=value pairs. Ensure key is same as the variables used.
+    #vim values.txt
+Pass this file name with the -var-file flag in plan or apply command.
+    #terraform plan -var-file values.txt
+For the values file to be picked up by terraform without -var-file, it must be named terraform.tfvars or have the extention *.auto.tfvars
+    #mv values.txt terraform.tfvars
+    #terraform plan
+    #mv terraform.tfvars my_values.auto.tfvars
+    #terraform apply
+    #mv my_values.auto.tfvars values.txt
+The types of variables available are string, number, bool, list, set, map. https://developer.hashicorp.com/terraform/language/expressions/types
+
+Terraform locals block allows for the substitution of repeating values within a workspace with a key.
+locals block is also used to maintain the value of a funtion/expression in a key that can be used repeatedly.
+This is better than processing the function repeatedly. https://developer.hashicorp.com/terraform/language/functions
+    #cd variables
+Create a local block to convert a string to uppercase and use that as the new parent directory of all local_file resources.
+    #vim main.tf
+    #terraform apply -var-file values.txt
+Lets create new variables
+    #vim output.tf
+    #terraform plan
 
 Modules are a full working terraform folder that can be reused.
 Any project of your will be the root module. This will contain multiple child and/or published modules. Let use terraform_vars as a child module
