@@ -150,7 +150,7 @@ Using the -target flag in plan, apply, or destroy command can get terraform to o
 It is not standard practice to use -target. Its best to edit/comment all the changes in main.tf.
 Lets revisit this for other meta-arguments.
 
-Terraform variables block allows us to reuse the code in different workspaces without needing to edit the code. https://developer.hashicorp.com/terraform/language/block/variable
+Variables block in terraform allows us to parameterize the code making it reuseable across workspaces. https://developer.hashicorp.com/terraform/language/block/variable
 Initialize a new workspace (directory or folder) with a local povider
     #mkdir terraform_vars
     #vim providers.tf
@@ -190,16 +190,53 @@ For the values file to be picked up by terraform without -var-file, it must be n
     #mv terraform.tfvars my_values.auto.tfvars
     #terraform apply
     #mv my_values.auto.tfvars values.txt
-The types of variables available are string, number, bool, list, set, map. https://developer.hashicorp.com/terraform/language/expressions/types
+The types primitive variables available are string, number, bool, list, set, map. https://developer.hashicorp.com/terraform/language/expressions/types
 
-Terraform locals block allows for the substitution of repeating values within a workspace with a key.
+Locals block in terraform allows for the substitution of repeating values within a workspace with a key. https://developer.hashicorp.com/terraform/language/block/locals
 locals block is also used to maintain the value of a funtion/expression in a key that can be used repeatedly.
 This is better than processing the function repeatedly. https://developer.hashicorp.com/terraform/language/functions
     #cd variables
-Create a local block to convert a string to uppercase and use that as the new parent directory of all local_file resources.
+Create a local block to to uppercase a string and use it as the new parent directory of all resources
+    #vim main.tf
+See if terraform can use the modification
+    #terraform apply -var-file values.txt
+
+Lets try out some complex types in variables like list, set and map. https://developer.hashicorp.com/terraform/language/expressions/types
+    #cd variables
+Create 2 variables. One must accept a set of strings with at least 2 default values
+And the other variable must accept a map of objects with at least 2 objects. Each object is a key value pair.
+    #vim variables
+Lets use these variables as the content and filename for new resources.
+for_each is the meta-argument can cycle through the variables within often the sets and maps. for_each can only work with sets and maps
+    #vim main.tf
+Can terraform make a plan with these variables?
+    #terraform plan
+If the default values picked up successfully, lets apply it with custom values that we will define in values file.
+    #vim values.txt
+    #terraform apply -var-file values.txt
+Lets try the formatlist funtion to add file extention to the elements of the set variable in the locals block
+    #vim main.tf
+list variable type is a set where elements can be refered by its positioning/ordering. Update the type of set variable to list type.
+    #vim variables.txt
+This allows us to cycle through the order using the count index rather than for_each.
+Create a new resource whose count is size of list, filename is made up by the formatlist, and content and filename cycle through count.index
     #vim main.tf
     #terraform apply -var-file values.txt
-Lets create new variables
+Complex type variables can nest/contain other complex data. Create a variable that accepts a nested map.
+    #vim variables.tf
+Type specification is optional for variables. You may set variable type as any when you are not trying to be restrictive.
+Using the nested map can be done with for_each meta-argument. Where we had used each.key and each.values, we will need to use each.key and each.value.subkey
+    #vim main.tf
+Can terraform make a plan with these variables?
+    #terraform plan
+If the default values picked up successfully, lets apply it with custom values that we will define in values file.
+    #vim values.txt
+    #terraform apply -var-file values.txt
+
+Output blocks in terraform are used to share relevant information after the processing of an workspace.
+This is often used to create a summary on stdout or to send data to another tool for further processing.
+    #cd variables
+Create a output block to share the number of resources created, path to all files, and their names
     #vim output.tf
     #terraform plan
 

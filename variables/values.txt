@@ -1,9 +1,29 @@
 file1 = "primary"
 file2 = "backup"
 replica = 3
-env = ["dev","stag","qa","edge","demo","prod","dr"]
+env = ["dev","stage","qa","edge","demo","prod","dr"]
 component = {
   "client" = "Welcome client. You will recieve data from frontend and you can repond to it"
   "frontend" = "Client has connected. Serve content. Forward responses to backend"
   "backend" = "Data from frontend will be processed here"
+}
+content = {
+  "index" = {
+    "ext" = "html"
+    "header" = "Welcome to shopping.com"
+    "body" = "Pick your favourite product from our Catalog"
+    "footer" = "Copyright (c) 2025 Author. All Rights Reserved."
+  }
+  "documentation" = {
+    "ext" = "doc"
+    "header" = "Instructions"
+    "body" = "Ensure all rules and policys are followed"
+    "footer" = "Reach out if you have any query"
+  }
+  "contact" = {
+    "ext" = "mail"
+    "header" = "Greeting user"
+    "body" = "I have recieved your request and will get back to you"
+    "footer" = "Regards\nBethsay Tom V"
+  }
 }
