@@ -196,7 +196,7 @@ Locals block in terraform allows for the substitution of repeating values within
 locals block is also used to maintain the value of a funtion/expression in a key that can be used repeatedly.
 This is better than processing the function repeatedly. https://developer.hashicorp.com/terraform/language/functions
     #cd variables
-Create a local block to to uppercase a string and use it as the new parent directory of all resources
+Create a local block to uppercase a string and use it as the new parent directory of all resources
     #vim main.tf
 See if terraform can use the modification
     #terraform apply -var-file values.txt
@@ -224,7 +224,7 @@ Create a new resource whose count is size of list, filename is made up by the fo
     #terraform apply -var-file values.txt
 Complex type variables can nest/contain other complex data. Create a variable that accepts a nested map.
     #vim variables.tf
-Type specification is optional for variables. You may set variable type as any when you are not trying to be restrictive.
+Type specification is optional for variables. You may set variable type as 'any' when you are not trying to be restrictive.
 Using the nested map can be done with for_each meta-argument. Where we had used each.key and each.values, we will need to use each.key and each.value.subkey
     #vim main.tf
 Can terraform make a plan with these variables?
@@ -236,9 +236,29 @@ If the default values picked up successfully, lets apply it with custom values t
 Output blocks in terraform are used to share relevant information after the processing of an workspace.
 This is often used to create a summary on stdout or to send data to another tool for further processing.
     #cd variables
-Create a output block to share the number of resources created, path to all files, and their names
+Create an output block to share the number of resources created. Use the length funtion for each local_file resource and add them up.
+Another output block to share the full path of the files created.
+Another output block to some of the filenames. Use the join function to convert a set or list to a string.
     #vim output.tf
     #terraform plan
+The output.path is relative. You can make it absolute path by using path.cwd in front of it. Also, use the trimprefix funtion to remove the '.' from local.path
+The output.items repeats the parent path for each file. You can filter it out using functions like basename, trimprefix, regex, element+split within a for loop.
+    #vim output.tf
+    #terraform apply -var-file values.txt
+After an apply, the output is also recorded as part of the state. To view them, you can
+    #terraform output
+    #terraform output items
+If you want to test out other functions https://developer.hashicorp.com/terraform/language/functions on any data within the workspace, you can try using
+    #terraform console
+Any of the output can be made sensitive. Set output.path as sensitive
+    #vim output.tf
+    #terraform apply -var-file values.txt
+    #terraform output
+Sensitive output would be masked during plan, apply and output. But it will be visible when specifically querrying it.
+    #terraform output path
+Lets set sensitive as false for output.path
+    #vim output.tf
+    #terraform apply -var-file values.txt
 
 Modules are a full working terraform folder that can be reused.
 Any project of your will be the root module. This will contain multiple child and/or published modules. Let use terraform_vars as a child module
