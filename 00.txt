@@ -152,7 +152,7 @@ Lets revisit this for other meta-arguments.
 
 Variables block in terraform allows us to parameterize the code making it reuseable across workspaces. https://developer.hashicorp.com/terraform/language/block/variable
 Initialize a new workspace (directory or folder) with a local povider
-    #mkdir terraform_vars
+    #mkdir variables_and_functions
     #vim providers.tf
         ->Use the hashicorp/local as a required_providers.
     #terraform init
@@ -195,17 +195,17 @@ The types primitive variables available are string, number, bool, list, set, map
 Locals block in terraform allows for the substitution of repeating values within a workspace with a key. https://developer.hashicorp.com/terraform/language/block/locals
 locals block is also used to maintain the value of a funtion/expression in a key that can be used repeatedly.
 This is better than processing the function repeatedly. https://developer.hashicorp.com/terraform/language/functions
-    #cd variables
+    #cd variables_and_functions
 Create a local block to uppercase a string and use it as the new parent directory of all resources
     #vim main.tf
 See if terraform can use the modification
     #terraform apply -var-file values.txt
 
 Lets try out some complex types in variables like list, set and map. https://developer.hashicorp.com/terraform/language/expressions/types
-    #cd variables
+    #cd variables_and_functions
 Create 2 variables. One must accept a set of strings with at least 2 default values
 And the other variable must accept a map of objects with at least 2 objects. Each object is a key value pair.
-    #vim variables
+    #vim variables.tf
 Lets use these variables as the content and filename for new resources.
 for_each is the meta-argument can cycle through the variables within often the sets and maps. for_each can only work with sets and maps
     #vim main.tf
@@ -235,7 +235,7 @@ If the default values picked up successfully, lets apply it with custom values t
 
 Output blocks in terraform are used to share relevant information after the processing of an workspace.
 This is often used to create a summary on stdout or to send data to another tool for further processing.
-    #cd variables
+    #cd variables_and_functions
 Create an output block to share the number of resources created. Use the length funtion for each local_file resource and add them up.
 Another output block to share the full path of the files created.
 Another output block to some of the filenames. Use the join function to convert a set or list to a string.
@@ -248,7 +248,7 @@ The output.items repeats the parent path for each file. You can filter it out us
 After an apply, the output is also recorded as part of the state. To view them, you can
     #terraform output
     #terraform output items
-If you want to test out other functions https://developer.hashicorp.com/terraform/language/functions on any data within the workspace, you can try using
+If you want to test out other functions https://developer.hashicorp.com/terraform/language/functions within the workspace, you can try using
     #terraform console
 Any of the output can be made sensitive. Set output.path as sensitive
     #vim output.tf
@@ -261,7 +261,7 @@ Lets set sensitive as false for output.path
     #terraform apply -var-file values.txt
 
 Modules are a full working terraform folder that can be reused.
-Any project of your will be the root module. This will contain multiple child and/or published modules. Let use terraform_vars as a child module
+Any project of your will be the root module. This will contain multiple child and/or published modules. Let use variables_and_functions as a child module
 mkdir -p terraform_root_module/child_module
 vim child_module/main.tf
 	terraform {

@@ -38,5 +38,5 @@ override.tf.json
 terraform.rc
 
 # Bethsay's changes
-variables/training
+variables_and_functions/training
 basics/training
